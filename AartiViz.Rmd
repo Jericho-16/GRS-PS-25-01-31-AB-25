@@ -1,0 +1,1018 @@
+---
+title: "AartiViz"
+author: "Haochen_Li"
+date: "2025-02-09"
+output: pdf_document
+---
+
+Loading data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+setwd("E:/Desktop/BU/2025 Spring/MA676/Consult")
+adp_fmt <- readxl::read_xlsx("adaptationdata_wdictionary.xlsx")
+spt_fmt <- readxl::read_xlsx("speciationdata_wdictionary.xlsx")
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(ggplot2)
+library(ggalluvial)
+```
+
+merge data and filter out -SESSION_pre, -SESSION_post
+
+```{r}
+adp_fmt <- adp_fmt %>%
+  mutate(session = 1) %>%
+  relocate(session, .after = SCHOOL)
+
+spt_fmt <- spt_fmt %>%
+  mutate(session = 0) %>%
+  relocate(session, .after = SCHOOL)
+
+# Merge the datasets
+merged_fmt <- bind_rows(adp_fmt, spt_fmt)
+merged_fmt <- merged_fmt %>% dplyr::select(-curriculum_type)
+```
+
+
+1: Kids' pre-existing conceptions of the nature of science (e.g. science is using microscopes) positively or negatively predict their post-test performance on the longer and shorter version of a challenging science curriculum
+
+session
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, session, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(scitools_pre = as.factor(session),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ scitools_pre, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across curriculum", 
+       x = "0=Speciation;1=Adaptation", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = scitools_pre), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ scitools_pre, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across curriculum",
+       x = "0=Speciation;1=Adaptation",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+scitools_pre
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, scitools_pre, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(scitools_pre = as.factor(scitools_pre),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ scitools_pre, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across Scitools_pre", 
+       x = "scitools_pre rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = scitools_pre), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ scitools_pre, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across Scitools_pre",
+       x = "scitools_pre rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+
+scievidence_pre
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, scievidence_pre, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(scievidence_pre = as.factor(scievidence_pre),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ scievidence_pre, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across scievidence_pre", 
+       x = "scievidence rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = scievidence_pre), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ scievidence_pre, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across scievidence_pre",
+       x = "scievidence rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+
+sciexplain_pre
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, sciexplain_pre, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(sciexplain_pre = as.factor(sciexplain_pre),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ sciexplain_pre, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across Scitools_pre", 
+       x = "sciexplain rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = sciexplain_pre), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ sciexplain_pre, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across Scitools_pre",
+       x = "sciexplain rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+
+selfsciid_pre
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, selfsciid_pre, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(selfsciid_pre = as.factor(selfsciid_pre),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ selfsciid_pre, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across Scitools_pre", 
+       x = "selfsciid_pre rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = selfsciid_pre), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ selfsciid_pre, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across Scitools_pre",
+       x = "selfsciid_pre rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+othersciid_pre
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, othersciid_pre, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(othersciid_pre = as.factor(othersciid_pre),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ othersciid_pre, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across Scitools_pre", 
+       x = "othersciid_pre rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = othersciid_pre), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ othersciid_pre, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across Scitools_pre",
+       x = "othersciid_pre rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+mindset_comp_pre (Converted into factor)
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, mindset_comp_pre, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(scitools_pre = as.factor(mindset_comp_pre),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ scitools_pre, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across mindset_comp_pre", 
+       x = "mindset_comp_pre(0-4)", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = scitools_pre), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ scitools_pre, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across mindset_comp_pre",
+       x = "mindset_comp_pre(0-4)",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+scitools_post
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, scitools_post, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(scitools_post = as.factor(scitools_post),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ scitools_post, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across Scitools_pre", 
+       x = "scitools_post rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = scitools_post), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ scitools_post, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across Scitools_pre",
+       x = "scitools_post rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+
+scievidence_post
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, scievidence_post, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(scievidence_post = as.factor(scievidence_post),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ scievidence_post, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across scievidence_post", 
+       x = "scievidence rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = scievidence_post), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ scievidence_post, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across scievidence_post",
+       x = "scievidence rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+
+sciexplain_post
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, sciexplain_post, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(sciexplain_post = as.factor(sciexplain_post),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ sciexplain_post, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across Scitools_pre", 
+       x = "sciexplain rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = sciexplain_post), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ sciexplain_post, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across Scitools_pre",
+       x = "sciexplain rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+
+selfsciid_post
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, selfsciid_post, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(selfsciid_post = as.factor(selfsciid_post),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ selfsciid_post, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across Scitools_pre", 
+       x = "selfsciid_post rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = selfsciid_post), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ selfsciid_post, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across Scitools_pre",
+       x = "selfsciid_post rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+othersciid_post
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, othersciid_post, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(othersciid_post = as.factor(othersciid_post),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ othersciid_post, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across Scitools_pre", 
+       x = "othersciid_post rated 1 - 4", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = othersciid_post), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ othersciid_post, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across Scitools_pre",
+       x = "othersciid_post rated 1 - 4",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+mindset_comp_post (Converted into factor)
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, mindset_comp_post, percentage_pre, percentage_post) %>%
+  pivot_longer(cols = c(percentage_pre, percentage_post), 
+               names_to = "timepoint", values_to = "percentage") %>%
+  mutate(scitools_pre = as.factor(mindset_comp_post),
+         timepoint = factor(timepoint, levels = c("percentage_pre", "percentage_post")),
+         percentage_bin = case_when(
+           percentage >= 0.75 & percentage <= 1 ~ "0.75-1",
+           percentage >= 0.50 & percentage < 0.75 ~ "0.50-0.75",
+           percentage >= 0.25 & percentage < 0.50 ~ "0.25-0.50",
+           percentage >= 0 & percentage < 0.25 ~ "0-0.25",
+           TRUE ~ NA_character_  
+         ),
+         percentage_bin = factor(percentage_bin, 
+                                 levels = rev(c("0-0.25", "0.25-0.50", "0.50-0.75", "0.75-1"))))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = percentage, fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ scitools_pre, scales = "free_y") +
+  labs(title = "Distribution of Percentage Pre vs Post across mindset_comp_post", 
+       x = "mindset_comp_post(0-4)", 
+       y = "Percentage Score", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("percentage_pre" = "#F44336", "percentage_post" = "#4CAF50"))
+
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = percentage_bin, alluvium = ID)) +
+  geom_alluvium(aes(fill = scitools_pre), width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = percentage_bin), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ scitools_pre, scales = "free_y") +
+  labs(title = "Individual tracking of Percentage Pre vs Post across mindset_comp_post",
+       x = "mindset_comp_post(0-4)",
+       y = "Number of Individuals",
+       fill = "Score Bin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("0-0.25" = "#FFB3BA", 
+                               "0.25-0.50" = "#FFDFBA", 
+                               "0.50-0.75" = "#FFFFBA", 
+                               "0.75-1" = "#BAFFC9"))
+
+
+# Print the plot
+print(p1)
+print(p2)
+```
+
+
+2: Whether kids participation in a longer vs. shorter version of a challenging curriculum changes three general conceptions of science.
+
+scievidence
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, session, scievidence_pre, scievidence_post) %>%
+  pivot_longer(cols = c(scievidence_pre, scievidence_post), 
+               names_to = "timepoint", values_to = "scievidence") %>%
+  mutate(session = as.factor(session),
+         timepoint = factor(timepoint, levels = c("scievidence_pre", "scievidence_post")),
+         scievidence = as.factor(scievidence))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = as.numeric(scievidence), fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ session, scales = "free_y") +
+  labs(title = "Distribution of changes in scievidence across curriculum", 
+       x = "0=Speciation;1=Adaptation", 
+       y = "Science Conception (1-4)", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("scievidence_pre" = "#F44336", "scievidence_post" = "#4CAF50"))
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = scievidence, alluvium = ID)) +
+  geom_alluvium(fill = NA, color = "black", width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = scievidence), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ session, scales = "free_y") +
+  labs(title = "Individual tracking of scievidence across curriculum",
+       x = "0=Speciation;1=Adaptation",
+       y = "Number of Individuals",
+       fill = "Science Conception (1-4)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("1" = "#FFB3BA",  
+                               "2" = "#FFDFBA",  
+                               "3" = "#FFFFBA",  
+                               "4" = "#BAFFC9"))
+
+# **Print the plots**
+print(p1)
+print(p2)
+```
+
+scitools_pre
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, session, scitools_pre, scitools_post) %>%
+  pivot_longer(cols = c(scitools_pre, scitools_post), 
+               names_to = "timepoint", values_to = "scitools") %>%
+  mutate(session = as.factor(session),
+         timepoint = factor(timepoint, levels = c("scitools_pre", "scitools_post")),
+         scitools = as.factor(scitools))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = as.numeric(scitools), fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ session, scales = "free_y") +
+  labs(title = "Distribution of changes in scitools across curriculum", 
+       x = "0=Speciation;1=Adaptation", 
+       y = "Science Conception (1-4)", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("scitools_pre" = "#F44336", "scitools_post" = "#4CAF50"))
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = scitools, alluvium = ID)) +
+  geom_alluvium(fill = NA, color = "black", width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = scitools), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ session, scales = "free_y") +
+  labs(title = "Individual tracking of scitools across curriculum",
+       x = "0=Speciation;1=Adaptation",
+       y = "Number of Individuals",
+       fill = "Science Conception (1-4)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("1" = "#FFB3BA",  
+                               "2" = "#FFDFBA",  
+                               "3" = "#FFFFBA",  
+                               "4" = "#BAFFC9"))
+
+# **Print the plots**
+print(p1)
+print(p2)
+```
+
+sciexplain
+
+```{r, fig.width=12, fig.height=8}
+df_f_long <- merged_fmt %>%
+  dplyr::select(ID, session, sciexplain_pre, sciexplain_post) %>%
+  pivot_longer(cols = c(sciexplain_pre, sciexplain_post), 
+               names_to = "timepoint", values_to = "sciexplain") %>%
+  mutate(session = as.factor(session),
+         timepoint = factor(timepoint, levels = c("sciexplain_pre", "sciexplain_post")),
+         sciexplain = as.factor(sciexplain))
+
+p1 <- ggplot(df_f_long, aes(x = timepoint, y = as.numeric(sciexplain), fill = timepoint)) +
+  geom_violin(alpha = 0.5, width = 0.8) +  
+  geom_boxplot(width = 0.2, color = "black", outlier.shape = NA, alpha = 0.6) +
+  facet_wrap(~ session, scales = "free_y") +
+  labs(title = "Distribution of changes in sciexplain across curriculum", 
+       x = "0=Speciation;1=Adaptation", 
+       y = "Science Conception (1-4)", 
+       fill = "Timepoint") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("sciexplain_pre" = "#F44336", "sciexplain_post" = "#4CAF50"))
+
+p2 <- ggplot(df_f_long, aes(x = timepoint, stratum = sciexplain, alluvium = ID)) +
+  geom_alluvium(fill = NA, color = "black", width = 0.2, alpha = 0.7) +
+  geom_stratum(aes(fill = sciexplain), width = 0.2, color = "grey") +
+geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3.5) +
+  facet_wrap(~ session, scales = "free_y") +
+  labs(title = "Individual tracking of sciexplain across curriculum",
+       x = "0=Speciation;1=Adaptation",
+       y = "Number of Individuals",
+       fill = "Science Conception (1-4)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14, face = "bold"),
+        axis.title.y = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        legend.text = element_text(size = 12)) +
+  scale_fill_manual(values = c("1" = "#FFB3BA",  
+                               "2" = "#FFDFBA",  
+                               "3" = "#FFFFBA",  
+                               "4" = "#BAFFC9"))
+
+# **Print the plots**
+print(p1)
+print(p2)
+```
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,281 @@
+---
+title: "Aarti0217"
+author: "Haochen_Li"
+date: "2025-02-17"
+output: pdf_document
+---
+
+Reshaping the dataset
+
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(lme4)
+library(ordinal)
+library(car)
+library(ggeffects)
+library(DHARMa)
+library(MASS)
+df <- read.csv("merge_fmt.csv")
+```
+
+```{r}
+pre_post_columns <- names(df)[grepl("_pre|_post", names(df))]
+percentage_columns <- c("percentage_pre", "percentage_post")
+
+# Convert to long format while keeping original variable names
+df_long <- df %>%
+  pivot_longer(
+    cols = setdiff(pre_post_columns, percentage_columns),  # Exclude percentage columns from reshaping
+    names_to = "Variable",
+    values_to = "Value"
+  ) %>%
+  mutate(
+    Time = ifelse(grepl("_pre$", Variable), 0, 1),  # Assign 0 for pre, 1 for post
+    Variable = gsub("_pre|_post", "", Variable)  # Remove _pre and _post to keep original variable names
+  ) %>%
+  pivot_wider(names_from = Variable, values_from = Value)  # Spread variables back into wide format
+
+# Retain percentage_pre and percentage_post while reshaping
+df_long <- df_long %>%
+  group_by(ID) %>%  # Ensure values are assigned correctly per ID
+  mutate(
+    percentage_pre = unique(percentage_pre, na.rm = TRUE),
+    percentage_post = unique(percentage_post, na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+
+
+```{r}
+df_long$scievidence  <- factor(df_long$scievidence, ordered = FALSE)
+df_long$scitools     <- factor(df_long$scitools, ordered = FALSE)
+df_long$sciexplain   <- factor(df_long$sciexplain, ordered = FALSE)
+df_long$selfsciid       <- factor(df_long$selfsciid, ordered = FALSE)
+df_long$session <- factor(df_long$session, ordered = FALSE)
+df_long$percentage_post <- factor(df_long$percentage_post)
+
+model_clmm <- clmm(
+  percentage_post ~ Time + scievidence + scitools + sciexplain + selfsciid +
+    session +
+    (1 | ID) +               # random intercept for student (if repeated measures per student)
+    (1 | SCHOOL),    # random intercept for each teacher nested in school
+  data = df_long,
+  link = "logit"
+)
+
+summary(model_clmm)
+
+df_long$percentage_post <- as.numeric(df_long$percentage_post)
+model <- lmer(
+  percentage_post ~ Time+ scievidence + scitools + sciexplain + selfsciid + session +(1 | SCHOOL),
+  data = df_long
+)
+summary(model)
+
+plot(model, which = 1)
+```
+
+
+Model fitting
+
+```{r}
+Null_model<- lmer(percentage ~ (1|ID) + (1|SCHOOL / TEACHER / session),
+              data = df_long)
+
+model1 <- lmer(percentage ~ (1|ID) + (1|SCHOOL / TEACHER / session) +
+                Time + scievidence + scitools + sciexplain +
+                Time:scievidence + Time:scitools + Time:sciexplain,
+              data = df_long)
+
+model2 <- lmer(
+  percentage ~ Time + scitools + scievidence + sciexplain +
+  Time:scitools + Time:scievidence + Time:sciexplain +
+  (1 | ID) + (1 | SCHOOL/TEACHER),
+  data = df_long
+)
+
+# model3 <- lmer(
+#   percentage ~ Time * sci_concept_composite +
+#   (1 | ID) + (1 | SCHOOL/TEACHER),
+#   data = df_long
+# )
+summary(Null_model)
+summary(model1)
+summary(model2)
+plot(model1, which = 1)
+plot(model2, which = 1)
+# summary(model3)
+```
+
+The null model and model 2 are indicating that one of the random effects are redundant.
+Also have potential problem with singularfit. But Time:SciExplain is significant in it, indicating student with higher score in the sciexplain will perform better when time goes on.
+
+
+Removing redundant random effect.
+
+```{r}
+# Final model with minimal random effects
+model_fixed <- lmer(
+  percentage_post ~ Time + scitools + scievidence + sciexplain +
+    Time:sciexplain +  # Keep only significant interaction
+    (1 | ID) + (1 | SCHOOL),
+  data = df_long
+)
+summary(model_fixed)
+plot(model_fixed, which = 1)
+```
+
+
+```{r}
+# Convert variables to factors
+df_long <- df_long %>%
+  mutate(
+    scitools = factor(scitools, ordered = TRUE),
+    scievidence = factor(scievidence, ordered = TRUE),
+    sciexplain = factor(sciexplain, ordered = TRUE)
+  )
+# i treat science as ordinal.
+
+# Refit the model with categorical predictors
+model_ordinal <- lmer(
+  percentage_post ~ Time + scitools + scievidence + sciexplain +
+    Time:scitools + Time:scievidence + Time:sciexplain +
+    (1 | ID) + (1 | SCHOOL),
+  data = df_long
+)
+
+
+
+summary(model_ordinal)
+
+# ii Use Polynomial Contrasts. Assuming a monotonic trend
+
+contrasts(df_long$scitools) <- contr.poly(4)
+contrasts(df_long$scievidence) <- contr.poly(4)
+contrasts(df_long$sciexplain) <- contr.poly(4)
+
+# Refit the model
+model_poly <- lmer(
+  percentage_post ~ Time + scitools + scievidence + sciexplain +
+    Time:scitools + Time:scievidence + Time:sciexplain +
+    (1 | ID) + (1 | SCHOOL),
+  data = df_long
+)
+summary(model_poly)
+plot(model_ordinal)
+```
+
+```{r}
+df1 <- read.csv("merge_fmt.csv")
+
+model_ancova <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + sciexplain_pre + 
+    percentage_pre +
+    (1 | SCHOOL / TEACHER),  # or (1 | SCHOOL) + (1 | TEACHER) if they are crossed
+  data = df1
+)
+
+
+model_simple <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + sciexplain_pre +
+    percentage_pre + (1 | SCHOOL),
+  data = df1
+)
+
+summary(model_ancova)
+summary(model_simple)
+plot(model_simple)
+AIC(model_ancova)
+AIC(model_simple)
+```
+
+```{r}
+df1$scitools_pre    <- factor(df1$scitools_pre, ordered = TRUE)
+df1$scievidence_pre <- factor(df1$scievidence_pre, ordered = TRUE)
+df1$sciexplain_pre  <- factor(df1$sciexplain_pre, ordered = TRUE)
+
+model_ordinal1 <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + sciexplain_pre +
+    percentage_pre + (1 | SCHOOL),
+  data = df1
+)
+
+ggpredict(model_ordinal1, terms = "sciexplain_pre[1,2,3,4]") %>% plot()
+```
+
+Binomial Mixed Model
+
+#  not all students answered all 6 questions. One student might skip items and still end up with the same “percentage correct” as someone who attempted all. This can lead to misleading residual patterns in a linear model and underweight important differences
+
+```{r}
+# Suppose 'count_right_post' is # correct, 'count_answered_post' is # answered
+model_binomial <- glmer(
+  cbind(count_right_post, count_answered_post - count_right_post) ~ 
+    scitools_pre + scievidence_pre + sciexplain_pre + 
+    (1 | SCHOOL),
+  family = binomial(link = "logit"),
+  data = df1
+)
+summary(model_binomial)
+
+ggpredict(model_binomial, terms = c("sciexplain_pre [all]")) %>% plot()
+
+sim_res <- simulateResiduals(model_binomial)
+plot(sim_res)
+testDispersion(sim_res)
+```
+
+```{r}
+library(glmmTMB)
+
+model_bb <- glmmTMB(
+  cbind(count_right_post, count_answered_post - count_right_post) ~ 
+    scitools_pre + scievidence_pre + sciexplain_pre + (1 | SCHOOL),
+  family = betabinomial(link = "logit"),
+  data = df
+)
+summary(model_bb)
+sim_res <- simulateResiduals(model_bb)
+plot(sim_res)
+testDispersion(sim_res)
+```
+
+scitools_pre emerges as a small but negative significant predictor: Students who more strongly associate science with “using tools” have (on average) slightly lower post scores.
+sciexplain_pre shows a borderline positive trend (p ~ 0.057)—those who see science as “explaining” do marginally better.
+scievidence_pre is not statistically significant.
+KS test p = 0.918 → No significant deviation in the overall distribution of residuals.
+Dispersion test p = 0.56 → No evidence of overdispersion (unlike the previous binomial model, which was overdispersed).
+Outlier test p = 0.32 → No extreme outliers relative to model expectations.
+
+```{r}
+model_bb2 <- glmmTMB(
+  cbind(count_right_post, count_answered_post - count_right_post) ~
+    scitools_pre + scievidence_pre + sciexplain_pre +
+    session +                     # new predictor: 1/0
+    (1 | SCHOOL/TEACHER),
+  family = betabinomial(link = "logit"),
+  data = df
+)
+
+model_bb2_int <- glmmTMB(
+  cbind(count_right_post, count_answered_post - count_right_post) ~
+    scitools_pre*session + scievidence_pre*session + sciexplain_pre*session +
+    (1 | SCHOOL/TEACHER),
+  family = betabinomial(link = "logit"),
+  data = df
+)
+
+summary(model_bb2)
+summary(model_bb2_int)
+sim_res <- simulateResiduals(model_bb2)
+plot(sim_res)
+testDispersion(sim_res)
+sim_res <- simulateResiduals(model_bb2_int)
+plot(sim_res)
+testDispersion(sim_res)
+```
+
+“Science is using tools” is associated with lower performance across both versions.
+“Science is explaining” helps most notably in the 12‐lesson group (where that slope is clearly positive).

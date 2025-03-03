@@ -1,0 +1,153 @@
+---
+title: "Aarti0220"
+author: "Haochen_Li"
+date: "2025-02-20"
+output: pdf_document
+---
+
+Reshaping the dataset
+
+```{r}
+library(tidyverse)
+library(lme4)
+library(car)
+library(DHARMa)
+library(MASS)
+library(glmmTMB)
+library(ordinal)
+library(nnet)
+library(lmtest)
+library(caret)
+```
+
+```{r}
+df <- read.csv("merge_fmt.csv")
+
+# Reshape
+pre_post_columns <- names(df)[grepl("_pre|_post", names(df))]
+percentage_columns <- c("percentage_pre", "percentage_post")
+
+# Convert to long format while keeping original variable names
+df_long <- df %>%
+  pivot_longer(
+    cols = setdiff(pre_post_columns, percentage_columns),  # Exclude percentage columns from reshaping
+    names_to = "Variable",
+    values_to = "Value"
+  ) %>%
+  mutate(
+    Time = ifelse(grepl("_pre$", Variable), 0, 1),  # Assign 0 for pre, 1 for post
+    Variable = gsub("_pre|_post", "", Variable)  # Remove _pre and _post to keep original variable names
+  ) %>%
+  pivot_wider(names_from = Variable, values_from = Value)  # Spread variables back into wide format
+
+# Retain percentage_pre and percentage_post while reshaping
+df_long <- df_long %>%
+  group_by(ID) %>%  # Ensure values are assigned correctly per ID
+  mutate(
+    percentage_pre = unique(percentage_pre, na.rm = TRUE),
+    percentage_post = unique(percentage_post, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+df_long$scievidence  <- factor(df_long$scievidence, ordered = FALSE)
+df_long$scitools     <- factor(df_long$scitools, ordered = FALSE)
+df_long$sciexplain   <- factor(df_long$sciexplain, ordered = FALSE)
+# df_long$selfsciid       <- factor(df_long$selfsciid, ordered = FALSE)
+# df_long$session <- factor(df_long$session, ordered = FALSE)
+# df_long$percentage_post <- factor(df_long$percentage_post)
+
+df$scievidence_pre  <- factor(df$scievidence_pre, ordered = FALSE)
+df$scitools_pre     <- factor(df$scitools_pre, ordered = FALSE)
+df$sciexplain_pre   <- factor(df$sciexplain_pre, ordered = FALSE)
+df$selfsciid_pre       <- factor(df$selfsciid_pre, ordered = FALSE)
+df$session <- factor(df$session, ordered = FALSE)
+df$percentage_post <- as.numeric(df$percentage_post)
+```
+
+(1) Kids' pre-existing conceptions of the nature of science (e.g. science is using microscopes) positively or negatively predict their post-test performance on the longer and shorter version of a challenging science curriculum
+
+```{r}
+model_lmer_df <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + sciexplain_pre + selfsciid_pre +
+    (1 | SCHOOL/TEACHER/session),
+  data = df
+)
+
+model_lmer_long <- lmer(
+  percentage_post ~ scitools + Time + scievidence + sciexplain + selfsciid + selfsciid +
+    (1 | SCHOOL/TEACHER/session),
+  data = df_long
+)
+summary(model_lmer_df)
+summary(model_lmer_long)
+```
+```{r}
+
+model_lmer_df <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + session + sciexplain_pre + selfsciid_pre +
+    (1 | SCHOOL/TEACHER),
+  data = df
+)
+
+model_lmer_long <- lmer(
+  percentage_post ~ scitools + Time + session + scievidence + sciexplain + selfsciid + selfsciid +
+    (1 | SCHOOL/TEACHER),
+  data = df_long
+)
+summary(model_lmer_df)
+summary(model_lmer_long)
+```
+
+
+
+(2) Whether kids participation in a longer vs. shorter version of a challenging curriculum changes three general conceptions of science
+
+
+```{r}
+df_long$scievidence  <- factor(df_long$scievidence, ordered = TRUE)
+df_long$scitools     <- factor(df_long$scitools, ordered = TRUE)
+df_long$sciexplain   <- factor(df_long$sciexplain, ordered = TRUE)
+
+model_scitools <- clmm(
+  scitools ~ Time * session + (1 | ID) + (1 | SCHOOL), 
+  data = df_long, 
+  link = "logit"
+)
+model_scievidence <- clmm(
+  scievidence ~ Time * session + (1 | ID) + (1 | SCHOOL), 
+  data = df_long, 
+  link = "logit"
+)
+model_sciexplain <- clmm(
+  sciexplain ~ Time * session + (1 | ID) + (1 | SCHOOL), 
+  data = df_long, 
+  link = "logit"
+)
+
+summary(model_scitools)
+summary(model_scievidence)
+summary(model_sciexplain)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
