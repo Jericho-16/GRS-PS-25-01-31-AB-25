@@ -1,0 +1,321 @@
+---
+title: "Aarti_Evolution_Project"
+author: "Truc Minh Nguyen"
+date: "2025-02-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(corrplot)
+library(tidyverse)
+```
+
+```{r}
+
+adapt_form <- read.csv("adaptationdata_wdictionary.csv")
+spec_form <- read.csv("speciationdata_wdictionary.csv")
+  
+```
+
+## Whether pre-test science conceptions are stronger predictors of a final test grade than pre-test science identity or beliefs about the fixedness of intelligence (fixed mindset)
+
+## Start with looking at post-scores vs. pre-test science conceptions
+```{r}
+# Post-scores vs. Pre-science Conceptions - Evidence for Adaptation
+ggplot(adapt_form, aes(x = factor(scievidence_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Conceptions - Evidence Adaption Curriculum",
+    x = "Pre-Science Evidence Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science evidence ratings
+table(adapt_form$scievidence_pre)
+```
+
+```{r}
+# Post-scores vs. Pre-science Conceptions - Evidence for Speciation
+ggplot(spec_form, aes(x = factor(scievidence_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Conceptions - Evidence Speciation Curriculum",
+    x = "Pre-Science Evidence Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science evidence ratings
+table(spec_form$scievidence_pre)
+```
+
+
+```{r}
+# Post-scores vs. Pre-science Conceptions - Tools for Adaptation
+ggplot(adapt_form, aes(x = factor(scitools_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Conceptions - Tools Adaptation Curriculum",
+    x = "Pre-Science Tools Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science Tools ratings
+table(adapt_form$scitools_pre)
+
+```
+
+
+```{r}
+# Post-scores vs. Pre-science Conceptions - Tools for Speciation
+ggplot(spec_form, aes(x = factor(scitools_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Conceptions - Tools Speciation Curriculum",
+    x = "Pre-Science Tools Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science Tools ratings
+table(spec_form$scitools_pre)
+
+```
+
+
+
+```{r}
+# Post-scores vs. Pre-science Conceptions - Explain Adaptation
+ggplot(adapt_form, aes(x = factor(sciexplain_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Conceptions - Explanation Adaptation Curriculum",
+    x = "Pre-Science Explanation Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science Explanations ratings
+table(adapt_form$sciexplain_pre)
+
+```
+Notes: I see that the counts for the pre-science conceptions are higher in the 
+rating category of 3 and 4 rather than 1 and 2. So the majority appears to initially
+agree with these science conception statements. The median for post scores appear to 
+be close to each other regardless of the pre-ratings category but the spread in 
+each category is a little different but the counts are also different..
+
+
+```{r}
+
+# Post-scores vs. Pre-science Conceptions - Explain Speciation
+ggplot(spec_form, aes(x = factor(sciexplain_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Conceptions - Explanation Speciation Curriculum",
+    x = "Pre-Science Explanation Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science Explanations ratings
+table(spec_form$sciexplain_pre)
+
+```
+
+
+## Next, look at post-test scores vs. pre-science identity ratings.
+
+```{r}
+# Post-scores vs. Pre-science Identity - Self Adaptation 
+ggplot(adapt_form, aes(x = factor(selfsciid_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Identity - Self Adaptation Curriculum",
+    x = "Pre-Science Self-Identity Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science Identity-self ratings
+table(adapt_form$selfsciid_pre)
+
+```
+
+
+```{r}
+# Post-scores vs. Pre-science Identity - Self Speciation
+ggplot(spec_form, aes(x = factor(selfsciid_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Identity - Self Speciation Curriculum",
+    x = "Pre-Science Self-Identity Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science Identity-self ratings
+table(spec_form$selfsciid_pre)
+```
+
+
+```{r}
+# Post-scores vs. Pre-science Identity - Others Adaptation
+ggplot(adapt_form, aes(x = factor(othersciid_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Identity - Others Adaptation Curriculum",
+    x = "Pre-Science Others-Identity Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science identity-others ratings
+table(adapt_form$othersciid_pre)
+
+```
+
+Notes: Interesting that they view themselves higher in science than what they 
+think others view them in science. Because the count for others rating in 
+category 4 is 18 for others vs. 83 for self.. 
+
+
+```{r}
+
+# Post-scores vs. Pre-science Identity - Others Speciation
+ggplot(spec_form, aes(x = factor(othersciid_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-science Identity - Others Speciation Curriculum",
+    x = "Pre-Science Others-Identity Ratings",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science identity-others ratings
+table(spec_form$othersciid_pre)
+
+```
+
+
+## Let's look at post-scores and pre-mindset composite scores
+```{r}
+# Post-scores vs. Pre-mindset composite scores Adaptation
+ggplot(adapt_form, aes(x = factor(mindset_comp_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-Mindset Composite Scores Adaptation Curriculum",
+    x = "Pre-Mindset Composite Scores",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science identity-others ratings
+table(adapt_form$mindset_comp_pre)
+
+```
+
+Notes: the outliers in category 1.33, 1.667, and 3 might be incomplete post test 
+where there were no-response..
+
+```{r}
+# Post-scores vs. Pre-mindset composite scores Speciation
+ggplot(spec_form, aes(x = factor(mindset_comp_pre), y = percentage_post)) +
+  geom_boxplot(fill = "skyblue", color = "darkblue") +
+  labs(
+    title = "Post-scores vs. Pre-Mindset Composite Scores Speciation Curriculum",
+    x = "Pre-Mindset Composite Scores",
+    y = "Post-scores"
+  ) +
+  theme_minimal()
+
+# Create table showing observation counts of Pre-science identity-others ratings
+table(spec_form$mindset_comp_pre)
+
+```
+
+
+### Let's look at the correlations among predictors and response variable
+
+```{r}
+
+# Subset the data to include only response and selected independent variables
+cor_data <- adapt_form %>%
+  select(percentage_post, scievidence_pre, scitools_pre, sciexplain_pre,
+         selfsciid_pre, othersciid_pre,
+         mindset_comp_pre)  
+
+
+cor_matrix <- cor(cor_data, use = "complete.obs", method = "pearson")
+
+print(cor_matrix)
+
+# Visualize correlation matrix
+corrplot(cor_matrix, method = "color", 
+         type = "upper",          # Show only upper triangle
+         tl.col = "black",        # Label color
+         tl.srt = 45,             # Rotate label text
+         addCoef.col = "black")   # Add correlation coefficients
+
+
+```
+
+Notes: doesn't seems alike any of these predictors have strong correlation with 
+response variable percentage_post. But some predictors seem to have strong correlation 
+with each other such as pre-science conception_evidence and pre-science 
+conception_explanation (0.45), and pre-self identity and pre-other identity (0.52).
+
+### Let's model with original dataset first 
+
+```{r}
+model_base_adapt <- lm(percentage_post ~ factor(selfsciid_pre) + factor(othersciid_pre) + 
+                   mindset_comp_pre, data = adapt_form)
+summary(model_base_adapt)
+
+model_full_adapt <- lm(percentage_post ~ factor(selfsciid_pre) + factor(othersciid_pre) 
+                 + mindset_comp_pre + factor(scievidence_pre) + 
+                   factor(scitools_pre) + factor(sciexplain_pre), 
+                 data = adapt_form)
+summary(model_full_adapt)
+anova(model_base_adapt,model_full_adapt)
+
+```
+
+
+
+```{r}
+model_base_spec <- lm(percentage_post ~ factor(selfsciid_pre) + factor(othersciid_pre) + 
+                   mindset_comp_pre, data = spec_form)
+summary(model_base_spec)
+
+model_full_spec <- lm(percentage_post ~ factor(selfsciid_pre) + factor(othersciid_pre) 
+                 + mindset_comp_pre + factor(scievidence_pre) + 
+                   factor(scitools_pre) + factor(sciexplain_pre), 
+                 data = spec_form)
+summary(model_full_spec)
+anova(model_base_spec,model_full_spec)
+
+```
+
+
+### Let's pivot data long to for modeling. 
+```{r}
+adapt_long <- adapt_form %>%
+  pivot_longer(
+    cols = -c(ID, SCHOOL, TEACHER, SES,curriculum_type), # Keep static columns
+    names_to = c("Variable", "Time_Pre_Post"), # Create new columns
+    names_pattern = "(.+)_(pre|post)" # Extract variable name and time (pre/post)
+  )
+
+# Reshape the long format data to wide format by spreading Variable into columns
+adap_long_final <- adapt_long %>%
+  pivot_wider(
+    names_from = Variable,  # Create new columns for each unique Variable
+    values_from = value     # Fill them with corresponding values
+  )
+
+```
+
