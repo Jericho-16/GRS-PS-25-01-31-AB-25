@@ -1,0 +1,201 @@
+---
+title: "Aarti0219"
+author: "Haochen_Li"
+date: "2025-02-19"
+output: pdf_document
+---
+
+Reshaping the dataset
+
+```{r}
+library(tidyverse)
+library(lme4)
+library(car)
+library(DHARMa)
+library(MASS)
+library(glmmTMB)
+library(ordinal)
+library(nnet)
+library(lmtest)
+library(caret)
+```
+
+```{r}
+df <- read.csv("merge_fmt.csv")
+
+# Reshape
+pre_post_columns <- names(df)[grepl("_pre|_post", names(df))]
+percentage_columns <- c("percentage_pre", "percentage_post")
+
+# Convert to long format while keeping original variable names
+df_long <- df %>%
+  pivot_longer(
+    cols = setdiff(pre_post_columns, percentage_columns),  # Exclude percentage columns from reshaping
+    names_to = "Variable",
+    values_to = "Value"
+  ) %>%
+  mutate(
+    Time = ifelse(grepl("_pre$", Variable), 0, 1),  # Assign 0 for pre, 1 for post
+    Variable = gsub("_pre|_post", "", Variable)  # Remove _pre and _post to keep original variable names
+  ) %>%
+  pivot_wider(names_from = Variable, values_from = Value)  # Spread variables back into wide format
+
+# Retain percentage_pre and percentage_post while reshaping
+df_long <- df_long %>%
+  group_by(ID) %>%  # Ensure values are assigned correctly per ID
+  mutate(
+    percentage_pre = unique(percentage_pre, na.rm = TRUE),
+    percentage_post = unique(percentage_post, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+df_long$scievidence  <- factor(df_long$scievidence, ordered = TRUE)
+df_long$scitools     <- factor(df_long$scitools, ordered = TRUE)
+df_long$sciexplain   <- factor(df_long$sciexplain, ordered = TRUE)
+df_long$ID <- as.factor(df_long$ID)
+df_long$SCHOOL <- as.factor(df_long$SCHOOL)
+
+df$scievidence_pre  <- factor(df$scievidence_pre, ordered = FALSE)
+df$scitools_pre     <- factor(df$scitools_pre, ordered = FALSE)
+df$sciexplain_pre   <- factor(df$sciexplain_pre, ordered = FALSE)
+df$selfsciid_pre       <- factor(df$selfsciid_pre, ordered = FALSE)
+df$session <- factor(df$session, ordered = FALSE)
+df$percentage_post <- as.numeric(df$percentage_post)
+```
+
+(1) Kids' pre-existing conceptions of the nature of science (e.g. science is using microscopes) positively or negatively predict their post-test performance on the longer and shorter version of a challenging science curriculum
+
+```{r}
+library(lmerTest)
+
+NUll_model_1 <- lmer(
+  percentage_post ~
+    (1 | SCHOOL) ,
+  data = df
+)
+
+NUll_model_2 <- lmer(
+  percentage_post ~
+    (1 | SCHOOL/TEACHER),
+  data = df
+)
+
+model_lmer <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + sciexplain_pre + selfsciid_pre + session +
+    (1 | SCHOOL),
+  data = df
+)
+#summary(NUll_model_1)
+#summary(NUll_model_2)
+summary(model_lmer, correlation=TRUE)
+```
+
+```{r}
+plot(model_lmer, which = 1)
+qqnorm(resid(model_lmer))
+qqline(resid(model_lmer))
+hist(resid(model_lmer), breaks = 30, main = "Histogram of Residuals")
+sim_res <- simulateResiduals(model_lmer)
+plot(sim_res)
+testDispersion(sim_res)
+```
+
+Binomial Mixed Model
+
+Not all students answered all 6 questions. One student might skip items and still end up with the same “percentage correct” as someone who attempted all. This can lead to misleading residual patterns in a linear model and underweight important differences
+
+```{r}
+model_binomial_1 <- glmer(
+  cbind(count_right_post, count_answered_post - count_right_post) ~ 
+    scitools_pre + scievidence_pre + sciexplain_pre + selfsciid_pre + session + mindset_comp_pre + othersciid_pre+
+    (1 | SCHOOL),
+  family = binomial(link = "logit"),
+  data = df
+)
+#summary(model_binomial_1)
+
+#drop insignificant
+# model_binomial_2 <- glmer(
+#   cbind(count_right_post, count_answered_post - count_right_post) ~ 
+#     scitools_pre + scievidence_pre + sciexplain_pre + selfsciid_pre + session +
+#     (1 | SCHOOL),
+#   family = binomial(link = "logit"),
+#   data = df
+# )
+# summary(model_binomial_2)
+
+sim_res <- simulateResiduals(model_binomial_1)
+plot(sim_res)
+testDispersion(sim_res)
+vif(model_binomial_1)
+```
+
+The scitools_pre predictor is also significant but with a negative estimate, suggesting a negative association. 
+
+The scievidence_pre predictor does not show a significant effect. 
+
+The session variable, indicating the shorter or longer curriculum, has a negative effect, implying that students in the shorter curriculum performed worse. 
+
+The variance of the random effect (school) is relatively small, suggesting some but limited variation across schools. 
+
+The DHARMa residual diagnostics reveal severe issues with dispersion and deviation, particularly in the first model, indicating poor model fit and a need for alternative modeling approaches.
+
+```{r}
+model_bb <- glmmTMB(
+  cbind(count_right_post, count_answered_post - count_right_post) ~ 
+        scitools_pre + scievidence_pre + sciexplain_pre + selfsciid_pre + session
+ + (1 | SCHOOL),
+  family = betabinomial(link = "logit"),
+  data = df
+)
+
+#summary(model_bb)
+sim_res <- simulateResiduals(model_bb)
+plot(sim_res)
+testDispersion(sim_res)
+```
+
+The result suggests that selfsciid_pre (self-science identity pre-test) is a significant predictor of post-test performance (p=0.0111).
+
+Session (p=0.069) and scitools_pre (p=0.0698) show marginal significance, suggesting that the length of the curriculum and pre-existing science tool understanding might have some influence, but the effects are not strongly significant.
+
+Other predictors, including scievidence_pre and sciexplain_pre, do not show a significant effect.
+
+The model fit is acceptable, with an AIC of 1257.5 and no major overdispersion issues (dispersion test p=0.752), indicating that the model appropriately captures the variance in the data.
+
+The DHARMa residual diagnostics confirm that there are no significant residual patterns, supporting the reliability of the model.
+
+(1) Kids' pre-existing conceptions of the nature of science (e.g. science is using microscopes) positively or negatively predict their post-test performance on the longer and shorter version of a challenging science curriculum
+
+```{r}
+model_lmer_df <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + sciexplain_pre + selfsciid_pre +
+    (1 | SCHOOL/TEACHER/session),
+  data = df
+)
+
+model_lmer_long <- lmer(
+  percentage_post ~ scitools + Time + scievidence + sciexplain + selfsciid + selfsciid +
+    (1 | SCHOOL/TEACHER/session),
+  data = df_long
+)
+summary(model_lmer_df)
+summary(model_lmer_long)
+```
+```{r}
+
+model_lmer_df <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + session + sciexplain_pre + selfsciid_pre +
+    (1 | SCHOOL/TEACHER),
+  data = df
+)
+
+model_lmer_long <- lmer(
+  percentage_post ~ scitools + Time + session + scievidence + sciexplain + selfsciid + selfsciid +
+    (1 | SCHOOL/TEACHER),
+  data = df_long
+)
+summary(model_lmer_df)
+summary(model_lmer_long)
+
+
