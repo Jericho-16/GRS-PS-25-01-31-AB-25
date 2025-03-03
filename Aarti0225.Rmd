@@ -1,0 +1,737 @@
+---
+title: "Aarti0219"
+author: "Haochen_Li"
+date: "2025-02-19"
+output: pdf_document
+---
+
+Reshaping the dataset
+
+```{r}
+library(tidyverse)
+library(lme4)
+library(car)
+library(DHARMa)
+library(MASS)
+library(glmmTMB)
+library(ordinal)
+library(nnet)
+library(lmtest)
+library(caret)
+library(cmdstanr)
+library(rstanarm)
+library(brms)
+library(performance)
+library(loo)
+library(ggplot2)
+library(bayesplot)
+df_long$scievidence  <- factor(df_long$scievidence, ordered = FALSE)
+df_long$scitools     <- factor(df_long$scitools, ordered = FALSE)
+df_long$sciexplain   <- factor(df_long$sciexplain, ordered = FALSE)
+df_long$ID <- as.factor(df_long$ID)
+df_long$SCHOOL <- as.factor(df_long$SCHOOL)
+```
+
+```{r}
+setwd("E:/Desktop/BU/2025 Spring/MA676/Consult")
+df <- read.csv("merge_fmt.csv")
+
+# Reshape
+pre_post_columns <- names(df)[grepl("_pre|_post", names(df))]
+percentage_columns <- c("percentage_pre", "percentage_post")
+
+# Convert to long format while keeping original variable names
+df_long <- df %>%
+  pivot_longer(
+    cols = setdiff(pre_post_columns, percentage_columns),  # Exclude percentage columns from reshaping
+    names_to = "Variable",
+    values_to = "Value"
+  ) %>%
+  mutate(
+    Time = ifelse(grepl("_pre$", Variable), 0, 1),  # Assign 0 for pre, 1 for post
+    Variable = gsub("_pre|_post", "", Variable)  # Remove _pre and _post to keep original variable names
+  ) %>%
+  pivot_wider(names_from = Variable, values_from = Value)  # Spread variables back into wide format
+
+# Retain percentage_pre and percentage_post while reshaping
+df_long <- df_long %>%
+  group_by(ID) %>%  # Ensure values are assigned correctly per ID
+  mutate(
+    percentage_pre = unique(percentage_pre, na.rm = TRUE),
+    percentage_post = unique(percentage_post, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+df_long$scievidence  <- factor(df_long$scievidence, ordered = TRUE)
+df_long$scitools     <- factor(df_long$scitools, ordered = TRUE)
+df_long$sciexplain   <- factor(df_long$sciexplain, ordered = TRUE)
+df_long$ID <- as.factor(df_long$ID)
+df_long$SCHOOL <- as.factor(df_long$SCHOOL)
+```
+(2) Whether kids participation in a longer vs. shorter version of a challenging curriculum changes three general conceptions of science
+
+```{r}
+model_scitools <- ordinal::clmm(
+  scitools ~ Time * session + (1 | ID) + (1 | SCHOOL), 
+  data = df_long, 
+  link = "logit",
+  control = clmm.control(method = "nlminb")
+)
+
+model_scievidence <- ordinal::clmm(
+  scievidence ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  link = "logit",
+  control = clmm.control(method = "nlminb")
+)
+model_sciexplain <- ordinal::clmm(
+  sciexplain ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  link = "logit",
+  control = clmm.control(method = "nlminb")
+)
+
+summary(model_scitools)
+summary(model_scievidence)
+summary(model_sciexplain)
+library(brant)
+brant(model_scitools)
+
+```
+
+model_scitools: No significant effects were found, suggesting that students' conceptions of science tools did not change based on time (pre vs. post) or curriculum length.
+
+model_scievidence: The length of the curriculum had a significant effect on students’ perceptions of scientific evidence (p = 0.0437). However, there was no evidence that students' perceptions changed over time (p = 0.1353).
+
+model_sciexplain: No significant effects were found in this model. Students' perceptions of scientific explanations did not change over time, nor were they affected by the curriculum length.
+
+```{r}
+model_scitools_npo <- ordinal::clmm(
+  scitools ~ Time * session + factor(scitools) * Time + factor(scitools) * session + (1 | ID) + (1 | SCHOOL), 
+  data = df_long, 
+  link = "logit",
+  control = clmm.control(method = "nlminb")
+)
+model_scievidence_npo <- ordinal::clmm(
+  scievidence ~ Time * session + factor(scievidence) * Time + factor(scievidence) * session + (1 | ID)+ (1 | SCHOOL), 
+  data = df_long, 
+  link = "logit",
+  control = clmm.control(method = "nlminb")
+)
+model_sciexplain_npo <- ordinal::clmm(
+  sciexplain ~ Time * session + factor(sciexplain) * Time + factor(sciexplain) * session+ (1 | ID)+ (1 | SCHOOL), 
+  data = df_long, 
+  link = "logit",
+  control = clmm.control(method = "nlminb")
+)
+summary(model_scitools_npo)
+summary(model_scievidence_npo)
+summary(model_sciexplain_npo)
+```
+
+
+Distribution Plot
+```{r}
+df_long_3cpt <- df_long %>%
+  pivot_longer(cols = c(scitools, scievidence, sciexplain), 
+               names_to = "Variable", 
+               values_to = "Value")
+
+
+ggplot(df_long_3cpt, aes(x = as.factor(Value), fill = Variable)) +
+  geom_bar(position = "dodge") +
+  facet_wrap(~ Variable, scales = "free_x") +
+  labs(title = "Distribution of Scitools, Scievidence, and Sciexplain",
+       x = "Category",
+       y = "Count") +
+  theme_minimal()
+
+```
+
+
+LRT test for scitools
+```{r}
+model_npo <- clmm(
+  scitools ~ Time * session + factor(scitools) + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  link = "logit"
+)
+anova(model_scitools, model_npo)
+VarCorr(model_scitools)
+```
+LRT test for scievidence
+```{r}
+model_npo <- clmm(
+  scievidence ~ Time * session + factor(scievidence) + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  link = "logit"
+)
+anova(model_scitools, model_npo)
+VarCorr(model_scitools)
+```
+LRT test for sciexplain
+```{r}
+model_npo <- clmm(
+  sciexplain ~ Time * session + factor(sciexplain) + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  link = "logit"
+)
+anova(model_scitools, model_npo)
+VarCorr(model_scitools)
+```
+
+Model comparison
+
+```{r}
+model_scitools_noSchool <- clmm(
+  scitools ~ Time * session + (1 | ID),
+  data = df_long,
+  link = "logit"
+)
+AIC(model_scitools, model_scitools_noSchool)
+
+model_scievidence_noSchool <- clmm(
+  scitools ~ Time * session + (1 | ID),
+  data = df_long,
+  link = "logit"
+)
+AIC(model_scievidence, model_scievidence_noSchool)
+
+model_sciexplain_noSchool <- clmm(
+  scitools ~ Time * session + (1 | ID),
+  data = df_long,
+  link = "logit"
+)
+AIC(model_sciexplain, model_sciexplain_noSchool)
+```
+
+
+
+
+preprocess grouped
+
+```{r}
+df_long$scitools_grouped <- factor(ifelse(df_long$scitools %in% c(1, 2), "1_2", as.character(df_long$scitools)),
+                                    levels = c("1_2", "3", "4"))
+df_long$scievidence_grouped <- factor(ifelse(df_long$scievidence %in% c(1, 2), "1_2", as.character(df_long$scievidence)),
+                                    levels = c("1_2", "3", "4"))
+df_long$sciexplain_grouped <- factor(ifelse(df_long$sciexplain %in% c(1, 2), "1_2", as.character(df_long$sciexplain)),
+                                    levels = c("1_2", "3", "4"))
+df_long$scitools_grouped <- factor(df_long$scitools_grouped, ordered = TRUE)
+df_long$scievidence_grouped <- factor(df_long$scievidence_grouped, ordered = TRUE)
+df_long$sciexplain_grouped <- factor(df_long$sciexplain_grouped, ordered = TRUE)
+```
+
+Baysian approach
+
+```{r}
+scitools_grouped_model <- brm(
+  scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit"),
+  chains = 4, iter = 4000, warmup = 500, cores = 8,
+  save_pars = save_pars(all = TRUE),
+  control = list(adapt_delta = 0.99, max_treedepth = 15)
+)
+
+scitools_grouped_npo_model <- brm(
+  scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+  control = list(adapt_delta = 0.99),
+  save_pars = save_pars(all = TRUE),
+  chains = 4, iter = 4000, cores = 8
+)
+
+scievidence_grouped_model <- brm(
+  scievidence_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit"),
+  chains = 4, iter = 4000, warmup = 500, cores = 8,
+  save_pars = save_pars(all = TRUE),
+  control = list(adapt_delta = 0.99, max_treedepth = 15)
+)
+
+scievidence_grouped_npo_model <- brm(
+  scievidence_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+  control = list(adapt_delta = 0.99),
+  save_pars = save_pars(all = TRUE),
+  chains = 4, iter = 4000, cores = 8
+)
+sciexplain_grouped_model <- brm(
+  sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit"),
+  chains = 4, iter = 4000, warmup = 500, cores = 8,
+  save_pars = save_pars(all = TRUE),
+  control = list(adapt_delta = 0.99, max_treedepth = 15)
+)
+
+sciexplain_grouped_npo_model <- brm(
+  sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+  control = list(adapt_delta = 0.99),
+  save_pars = save_pars(all = TRUE),
+  chains = 4, iter = 4000, cores = 8
+)
+scitools_grouped_model <- brm(
+  scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit"),
+  chains = 4, iter = 4000, warmup = 500, cores = 8,
+  save_pars = save_pars(all = TRUE),
+  control = list(adapt_delta = 0.99, max_treedepth = 15)
+)
+
+scitools_grouped_npo_model <- brm(
+  scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+  control = list(adapt_delta = 0.99),
+  save_pars = save_pars(all = TRUE),
+  chains = 4, iter = 4000, cores = 8
+)
+
+scievidence_grouped_model <- brm(
+  scievidence_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit"),
+  chains = 4, iter = 4000, warmup = 500, cores = 8,
+  save_pars = save_pars(all = TRUE),
+  control = list(adapt_delta = 0.99, max_treedepth = 15)
+)
+
+scievidenc_grouped_npo_model <- brm(
+  sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+  control = list(adapt_delta = 0.99),
+  save_pars = save_pars(all = TRUE),
+  chains = 4, iter = 4000, cores = 8
+)
+sciexplain_grouped_model <- brm(
+  sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit"),
+  chains = 4, iter = 4000, warmup = 500, cores = 8,
+  save_pars = save_pars(all = TRUE),
+  control = list(adapt_delta = 0.99, max_treedepth = 15)
+)
+
+sciexplain_grouped_npo_model <- brm(
+  sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+  control = list(adapt_delta = 0.99),
+  save_pars = save_pars(all = TRUE),
+  chains = 4, iter = 4000, cores = 8
+)
+```
+store(iter=4000, npo model)
+```{r}
+models <- list(
+  ###
+  ###
+  ###grouped
+  ##scitools_grouped_model
+  scitools_grouped_model <- brm(
+    scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+
+  scitools_grouped_npo_model <- brm(
+    scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  #scievidence_grouped_model
+  scievidence_grouped_model <- brm(
+    scievidence_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+
+  scievidence_grouped_npo_model <- brm(
+    scievidence_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  #sciexplain_grouped_model
+  sciexplain_grouped_model <- brm(
+    sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+  
+  sciexplain_grouped_npo_model <- brm(
+    sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  
+  ##ungroup
+  ##ungroup
+  ##ungroup
+  scitools_model <- brm(
+    scitools ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+  
+  scitools_npo_model <- brm(
+    scitools ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  
+  scievidence_model <- brm(
+    scievidence ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+  
+  scievidence_npo_model <- brm(
+    scievidence ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  sciexplain_model <- brm(
+    sciexplain ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+  
+  sciexplain_npo_model <- brm(
+    sciexplain ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  )
+)
+
+for (model_name in names(models)) {
+  saveRDS(models[[model_name]], file = paste0(model_name, ".rds"))
+}
+```
+
+store1
+```{r}
+models <- list(
+  ###
+  ###
+  ###grouped
+  ##scitools_grouped_model
+  scitools_grouped_model <- brm(
+    scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", disc = ~ 1),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+
+  scitools_grouped_npo_model <- brm(
+    scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  #scievidence_grouped_model
+  scievidence_grouped_model <- brm(
+    scievidence_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+
+  scievidence_grouped_npo_model <- brm(
+    scievidence_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  #sciexplain_grouped_model
+  sciexplain_grouped_model <- brm(
+    sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+  
+  sciexplain_grouped_npo_model <- brm(
+    sciexplain_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  
+  ##ungroup
+  ##ungroup
+  ##ungroup
+  scitools_model <- brm(
+    scitools ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+  
+  scitools_npo_model <- brm(
+    scitools ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  
+  scievidence_model <- brm(
+    scievidence ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+  
+  scievidence_npo_model <- brm(
+    scievidence ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  ),
+  sciexplain_model <- brm(
+    sciexplain ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit"),
+    chains = 4, iter = 4000, warmup = 500, cores = 8,
+    save_pars = save_pars(all = TRUE),
+    control = list(adapt_delta = 0.99, max_treedepth = 15)
+  ),
+  
+  sciexplain_npo_model <- brm(
+    sciexplain ~ Time * session + (1 | ID) + (1 | SCHOOL),
+    data = df_long,
+    family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+    control = list(adapt_delta = 0.99),
+    save_pars = save_pars(all = TRUE),
+    chains = 4, iter = 4000, cores = 8
+  )
+)
+
+for (model_name in names(models)) {
+  saveRDS(models[[model_name]], file = paste0(model_name, ".rds"))
+}
+```
+
+scitools
+```{r}
+summary(scitools_grouped_model)
+# Students show a slight improvement in science conceptions post-test (Time > 0), but the effect is weak and uncertain.
+# Longer curriculum (Session = 1) does not significantly improve conceptions and might even slightly decrease them.
+# The interaction (Time:Session) is nearly zero, meaning the effect of Time does not differ based on session length.
+# Most variability is at the individual level (sd[ID] = 1.47), meaning students differ more than schools.
+
+summary(scitools_grouped_npo_model)
+bayes_factor(scitools_grouped_model, scitools_grouped_npo_model)
+
+loo_compare(loo(scitools_grouped_model), loo(scitools_grouped_npo_model))
+
+#Since the NPO model (Non-Proportional Odds) does not improve fit, you can keep the simpler PO model.
+plot(conditional_effects(scitools_grouped_model, "session", categorical = TRUE))
+plot(conditional_effects(scitools_grouped_model, "Time", categorical = TRUE))
+plot(conditional_effects(scitools_grouped_model, effects = "Time", categorical = TRUE,conditions = list(session = c(0, 1))))
+
+# plot(conditional_effects(scitools_grouped_npo_model, "session", categorical = TRUE))
+# plot(conditional_effects(scitools_grouped_npo_model, "Time", categorical = TRUE))
+# plot(conditional_effects(scitools_grouped_npo_model, effects = "Time", categorical = TRUE,conditions = list(session = c(0, 1))))
+
+pp_check(scitools_grouped_model)
+# pp_check(scitools_grouped_npo_model)
+pp_check(scitools_grouped_model, type = "scatter_avg")
+#The model slightly over-predicts middle categories and under-predicts extreme categories
+pp_check(scitools_grouped_model, type = "stat_2d")
+# The model predicts the mean well, suggesting reasonable overall calibration.However, small discrepancies in variance may indicate missing predictors or threshold misalignment.
+# pp_check(scitools_grouped_npo_model, type = "scatter_avg")
+# # The NPO model performs slightly better than the PO model at predicting middle-range scores.However, it still has difficulty fully capturing category transitions, especially at the extremes.
+# pp_check(scitools_grouped_npo_model, type = "stat_2d")
+# # Smaller spread in predictions than in real data. Model might underestimate variability.
+
+
+```
+scievidence_grouped_model
+```{r}
+# summary(scievidence_grouped_model)
+summary(scievidence_grouped_npo_model)
+
+bayes_factor(scievidence_grouped_model, scievidence_grouped_npo_model)
+loo_compare(loo(scievidence_grouped_model), loo(scievidence_grouped_npo_model))
+plot(conditional_effects(scievidence_grouped_model, "session", categorical = TRUE))
+plot(conditional_effects(scievidence_grouped_model, "Time", categorical = TRUE))
+plot(conditional_effects(scievidence_grouped_model, effects = "Time", categorical = TRUE,conditions = list(session = c(0, 1))))
+
+# plot(conditional_effects(scievidence_grouped_npo_model, "session", categorical = TRUE))
+# plot(conditional_effects(scievidence_grouped_npo_model, "Time", categorical = TRUE))
+# plot(conditional_effects(scievidence_grouped_npo_model, effects = "Time", categorical = TRUE,conditions = list(session = c(0, 1))))
+
+pp_check(scievidence_grouped_model)
+# pp_check(scievidence_grouped_npo_model)
+pp_check(scievidence_grouped_model, type = "scatter_avg")
+
+pp_check(scievidence_grouped_model, type = "stat_2d")
+
+# pp_check(scievidence_grouped_npo_model, type = "scatter_avg")
+# # The NPO model performs slightly better than the PO model at predicting middle-range scores.However, it still has difficulty fully capturing category transitions, especially at the extremes.
+# pp_check(scievidence_grouped_npo_model, type = "stat_2d")
+
+```
+
+```{r}
+summary(sciexplain_grouped_model)
+
+summary(sciexplain_grouped_npo_model)
+bayes_factor(sciexplain_grouped_model, sciexplain_grouped_npo_model)
+loo_compare(loo(sciexplain_grouped_model), loo(sciexplain_grouped_npo_model))
+
+plot(conditional_effects(sciexplain_grouped_model, "session", categorical = TRUE))
+plot(conditional_effects(sciexplain_grouped_model, "Time", categorical = TRUE))
+plot(conditional_effects(sciexplain_grouped_model, effects = "Time", categorical = TRUE,conditions = list(session = c(0, 1))))
+
+# plot(conditional_effects(sciexplain_grouped_npo_model, "session", categorical = TRUE))
+# plot(conditional_effects(sciexplain_grouped_npo_model, "Time", categorical = TRUE))
+# plot(conditional_effects(sciexplain_grouped_npo_model, effects = "Time", categorical = TRUE,conditions = list(session = c(0, 1))))
+
+pp_check(sciexplain_grouped_model)
+# pp_check(sciexplain_grouped_model)
+pp_check(sciexplain_grouped_model, type = "scatter_avg")
+
+pp_check(sciexplain_grouped_model, type = "stat_2d")
+
+# pp_check(sciexplain_grouped_npo_model, type = "scatter_avg")
+# # The NPO model performs slightly better than the PO model at predicting middle-range scores.However, it still has difficulty fully capturing category transitions, especially at the extremes.
+# pp_check(sciexplain_grouped_npo_model, type = "stat_2d")
+```
+
+
+
+Ungrouped comparison
+```{r}
+# scitools_grouped_model <- brm(
+#   scitools_grouped ~ Time * session + (1 | ID) + (1 | SCHOOL),
+#   data = df_long,
+#   family = cumulative(link = "logit"),
+#   chains = 4, iter = 4000, warmup = 500, cores = 8,
+#   control = list(adapt_delta = 0.99, max_treedepth = 15)
+# )
+# scitools_model <- brm(
+#   scitools ~ Time * session + (1 | ID) + (1 | SCHOOL),
+#   data = df_long,
+#   family = cumulative(link = "logit"),
+#   chains = 4, iter = 4000, warmup = 500, cores = 8,
+#   control = list(adapt_delta = 0.99, max_treedepth = 15)
+# )
+pp_check(scitools_npo_model, type = "stat_2d")
+pp_check(scitools_npo_model, type = "scatter_avg")
+
+
+bayes_factor(scitools_grouped_model, scitools_model)
+scitools_npo_model <- brm(
+  scitools ~ Time * session + (1 | ID) + (1 | SCHOOL),
+  data = df_long,
+  family = cumulative(link = "logit", threshold = "flexible"),  # Allows category-specific effects
+  control = list(adapt_delta = 0.99),
+  chains = 4, iter = 4000, cores = 8
+)
+
+bayes_factor(scitools_grouped_model, scitools_model)
+loo_compare(loo(scitools_model), loo(scitools_npo_model))
+
+plot(conditional_effects(scitools_model, "session", categorical = TRUE))
+plot(conditional_effects(scitools_model, "Time", categorical = TRUE))
+plot(conditional_effects(scitools_model, effects = "Time", categorical = TRUE,conditions = list(session = c(0, 1))))
+
+plot(conditional_effects(scitools_npo_model, "session", categorical = TRUE))
+plot(conditional_effects(scitools_npo_model, "Time", categorical = TRUE))
+plot(conditional_effects(scitools_npo_model, effects = "Time", categorical = TRUE,conditions = list(session = c(0, 1))))
+
+pp_check(scitools_model)
+# pp_check(scitools_npo_model)
+pp_check(scitools_model, type = "scatter_avg")
+
+pp_check(scitools_model, type = "stat_2d")
+
+pp_check(scitools_npo_model, type = "scatter_avg")
+# The NPO model performs slightly better than the PO model at predicting middle-range scores.However, it still has difficulty fully capturing category transitions, especially at the extremes.
+pp_check(scitools_npo_model, type = "stat_2d")
+
+```
+
+
+```{r}
+anova(scitools_grouped_model, scitools_grouped_npo_model)
+
+loo_compare(loo(scitools_grouped_model), loo(scitools_model))
+```
+
+
+
+
+
+
+
+
+
+
+
