@@ -165,6 +165,39 @@ The model fit is acceptable, with an AIC of 1257.5 and no major overdispersion i
 
 The DHARMa residual diagnostics confirm that there are no significant residual patterns, supporting the reliability of the model.
 
+(1) Kids' pre-existing conceptions of the nature of science (e.g. science is using microscopes) positively or negatively predict their post-test performance on the longer and shorter version of a challenging science curriculum
+
+```{r}
+model_lmer_df <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + sciexplain_pre + selfsciid_pre +
+    (1 | SCHOOL/TEACHER/session),
+  data = df
+)
+
+model_lmer_long <- lmer(
+  percentage_post ~ scitools + Time + scievidence + sciexplain + selfsciid + selfsciid +
+    (1 | SCHOOL/TEACHER/session),
+  data = df_long
+)
+summary(model_lmer_df)
+summary(model_lmer_long)
+```
+```{r}
+
+model_lmer_df <- lmer(
+  percentage_post ~ scitools_pre + scievidence_pre + session + sciexplain_pre + selfsciid_pre +
+    (1 | SCHOOL/TEACHER),
+  data = df
+)
+
+model_lmer_long <- lmer(
+  percentage_post ~ scitools + Time + session + scievidence + sciexplain + selfsciid + selfsciid +
+    (1 | SCHOOL/TEACHER),
+  data = df_long
+)
+summary(model_lmer_df)
+summary(model_lmer_long)
+
 (2) Whether kids participation in a longer vs. shorter version of a challenging curriculum changes three general conceptions of science
 
 ```{r}
