@@ -1,5 +1,5 @@
 ---
-title: "AartiViz"
+title: "Viz"
 author: "Haochen_Li"
 date: "2025-02-09"
 output: pdf_document
